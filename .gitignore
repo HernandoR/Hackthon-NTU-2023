@@ -143,3 +143,4 @@ __MACOSX/
 # personal config files
 *.cfg
 config.json
+test.ipynb
