@@ -1,7 +1,10 @@
-pytorch
-torchvision
+# pytorch
+# torchvision
 numpy
 tqdm
 # tensorboard>=1.14
 h5py
+matplotlib
 sagemaker
+boto3
+Nibabel

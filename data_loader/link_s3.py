@@ -6,25 +6,36 @@ in given AWS S3 link
 import os
 import sagemaker
 import boto3
+import sys
 
 import logging
-
+# import tqdm
 from botocore.exceptions import ClientError
 
 
 class AWS_S3_Loader:
-    AWS_DEFAULT_REGION="ap-southeast-1"
-    AWS_ACCESS_KEY_ID= "ASIA6HN7YGSV6NGLNAJR"
-    AWS_SECRET_ACCESS_KEY="/B0IUnQhP2AhxYvGiXFeMu0aY6LMPM/acaVWx5yC"
-    SESSION_TOKEN="IQoJb3JpZ2luX2VjEM3//////////wEaCXVzLWVhc3QtMSJHMEUCIQDutumRKqOXa7SiVVVUcGSMMTU+SRNDD39bkHjpsnSYGQIgMPl2i4Pgdbt07XHmyeezbETvNDFogYf8LOXPEj25JMAqoAIIhf//////////ARAAGgw5NzgwNDQwNzMxMzEiDO6cAFo/OubWKVPpByr0AbKFjXp+hS2lh1wQp8EJYgRNpfKQSQ16zu9jhRcBd4yJl8D/EZ7lnV/fdEa1hnDjXqdJtHbDf1SlvWTL6QZkoKToGn3IkqqEF34gFt4xFRFkybDfEfnffaaXw62sEm7buQ+iDlaAbnTsgrmYLyrDfbVeo79dBJCk/mJnZxh6BOq2tYDKMKD+B09xEA+gJwdf4biTAjWzeR1zBVpCpqobrFjRbF4W/bpAs6UAc3AgKs+MFpVd9IU8fJJmpL/lZVuloCF+nu9XEFMJyb+hHm3Yw1puV1aG0IdDapH/UfFRQAX5WdoMRSMhd3uYUl7FWPSjSwxK5sowuv+voAY6nQHb+J25voauxka2rn/PVi8w40RjmaR7ElS7y045qWs5io0sU1BBBkWqN49gBf9JuJvw40Cu7AHvabRxWlTBP0ar/qo5Smw9V0a1z4irF3/AtIx837v6JCK4cfyhHahFD3rNTP0cT77ZYbHjnfYpV8b4im4cpWGqeK8rQYkpAk5dVMMP5dYHWce2+YnAyluG1QpSvM+5A/KCU37oKncm"
+    AWS_DEFAULT_REGION=os.getenv('AWS_DEFAULT_REGION')
+    AWS_ACCESS_KEY_ID=os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY=os.getenv('AWS_SECRET_ACCESS_KEY')
+    SESSION_TOKEN=os.getenv('AWS_SESSION_TOKEN')
 
+    if not all ([AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SESSION_TOKEN]):
+        
+        print("Please set the environment variables")
+        sys.exit()
+
+    logging.info("AWS_DEFAULT_REGION: %s", AWS_DEFAULT_REGION)
+    logging.info("AWS_ACCESS_KEY_ID: %s", AWS_ACCESS_KEY_ID)
+    logging.info("AWS_SECRET_ACCESS_KEY: %s", AWS_SECRET_ACCESS_KEY)
+    logging.info("SESSION_TOKEN: %s", SESSION_TOKEN[:10])
 
     def __init__(self, bucket_name):
         self.client = boto3.client('s3', 
                     region_name=self.AWS_DEFAULT_REGION, 
                     aws_access_key_id=self.AWS_ACCESS_KEY_ID, 
                     aws_secret_access_key=self.AWS_SECRET_ACCESS_KEY, 
-                    aws_session_token=self.SESSION_TOKEN)
+                    aws_session_token=self.SESSION_TOKEN
+                    )
         self.bucket_name = bucket_name
 
     def list_files(self, bucket_name, path):
@@ -52,10 +63,28 @@ class AWS_S3_Loader:
         except ClientError as e:
             logging.error(e)
         return True
+    
+    def list_files(self, bucket_name, path):
+        response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=path)
+        return [content['Key'] for content in response['Contents']]
+
+    def download_dir(self, remote_path, local_path):
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
+        for file in self.list_files(self.bucket_name, remote_path):
+            self.download_file(file, file.replace(remote_path, local_path, 1))
+
 
     def download_file(self, file_path, local_path):
         try:
+            if not os.path.exists(os.path.dirname(local_path)):
+                os.makedirs(os.path.dirname(local_path))
+
+            if os.path.exists(local_path):
+                if input(f"File {local_path} already exists. Do you want to overwrite it? (y/n)") != "y":
+                    return False
             response=self.client.download_file(self.bucket_name, file_path, local_path)
+            
         except ClientError as e:
             logging.error(e)
             return False
